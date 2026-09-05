@@ -16,31 +16,43 @@ jobs:
       - name: Unzip ROM
         run: unzip -o rom.zip -d rom_extracted
 
-      - name: Install extraction tools
+      - name: Install tools
         run: |
-          pip install --break-system-packages liblp
-          sudo apt-get update && sudo apt-get install -y simg2img android-sdk-libsparse-utils p7zip-full
+          sudo apt-get update
+          sudo apt-get install -y brotli e2tools
+          curl -L -o sdat2img.py https://raw.githubusercontent.com/xpirt/sdat2img/master/sdat2img.py
 
-      - name: Find and unpack super/vendor image
+      - name: Decompress and rebuild vendor.img
         run: |
           cd rom_extracted
-          ls -la
-          if [ -f super.img ]; then
-            simg2img super.img super.raw.img || cp super.img super.raw.img
-            python3 -m liblp super.raw.img -o unpacked
+          if [ -f vendor.new.dat.br ]; then
+            brotli -d vendor.new.dat.br -o vendor.new.dat
+            python3 ../sdat2img.py vendor.transfer.list vendor.new.dat vendor.img
           fi
+
+      - name: Decompress and rebuild system.img (phòng khi mixer nằm bên system)
+        run: |
+          cd rom_extracted
+          if [ -f system.new.dat.br ]; then
+            brotli -d system.new.dat.br -o system.new.dat
+            python3 ../sdat2img.py system.transfer.list system.new.dat system.img
+          fi
+
+      - name: List contents of vendor.img
+        run: |
+          cd rom_extracted
           if [ -f vendor.img ]; then
-            simg2img vendor.img vendor.raw.img || cp vendor.img vendor.raw.img
-            mkdir -p vendor_extract
-            7z x vendor.raw.img -ovendor_extract || sudo mount -o loop vendor.raw.img vendor_mount
+            e2ls -R vendor.img:/ > vendor_filelist.txt || true
           fi
 
       - name: Locate mixer_paths.xml
-        run: find rom_extracted -iname "*mixer_paths*" | tee found_files.txt
+        run: |
+          cd rom_extracted
+          grep -i "mixer_paths" vendor_filelist.txt || echo "Not found in vendor_filelist.txt, listing all:" 
+          cat vendor_filelist.txt | tee found_files.txt
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mixer-search-result
-          path: |
-            found_files.txt
-            rom_extracted/**/mixer_paths*.xml
+      - name: Extract mixer_paths.xml file itself
+        run: |
+          cd rom_extracted
+          MIXER_PATH=$(grep -i "mixer_paths" vendor_filelist.txt | head -1 | awk '{print $NF}')
+          if [ -n "$MIXER_PATH" ];
