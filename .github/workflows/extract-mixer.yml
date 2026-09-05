@@ -25,18 +25,16 @@ jobs:
       - name: Decompress and rebuild vendor.img
         run: |
           cd rom_extracted
-          if [ -f vendor.new.dat.br ]; then
-            brotli -d vendor.new.dat.br -o vendor.new.dat
-            python3 ../sdat2img.py vendor.transfer.list vendor.new.dat vendor.img
-          fi
+          brotli -d vendor.new.dat.br -o vendor.new.dat
+          python3 ../sdat2img.py vendor.transfer.list vendor.new.dat vendor.img
 
-      - name: Mount vendor.img and search
+      - name: Mount vendor.img and extract mixer_paths.xml
         run: |
           cd rom_extracted
           mkdir -p vendor_mount
           sudo mount -o loop,ro vendor.img vendor_mount
-          find vendor_mount -iname "*mixer_paths*" | tee ../found_files.txt
-          find vendor_mount -iname "*mixer_paths*" -exec cp {} ../ \;
+          sudo find vendor_mount -iname "*mixer_paths*" 2>/dev/null | tee ../found_files.txt
+          sudo find vendor_mount -iname "*mixer_paths*" -exec sudo cp {} ../ \; 2>/dev/null
           sudo umount vendor_mount
 
       - uses: actions/upload-artifact@v4
