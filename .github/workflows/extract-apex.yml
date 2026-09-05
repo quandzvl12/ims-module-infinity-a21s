@@ -40,30 +40,19 @@ jobs:
           mkdir -p capex_unpack
           cd capex_unpack
           unzip -o ../telephonycore.capex
-          ls -la
-          echo "--- looking for original_apex ---"
-          if [ -f original_apex ]; then
-            mkdir -p apex_unpack
-            cd apex_unpack
-            unzip -o ../original_apex
-            ls -la
-            echo "--- looking for apex_payload.img ---"
-            if [ -f apex_payload.img ]; then
-              mkdir -p payload_mount
-              sudo mount -o loop,ro apex_payload.img payload_mount
-              find payload_mount -type f \( -iname "*.jar" -o -iname "*.apk" \) > ../../jar_list.txt
-              cat ../../jar_list.txt
-              echo "--- searching for MmTelFeature.class ---"
-              find payload_mount -type f \( -iname "*.jar" -o -iname "*.apk" \) | while read f; do
-                if unzip -l "$f" 2>/dev/null | grep -qi "MmTelFeature.class"; then
-                  echo "FOUND IN: $f" | tee -a ../../result.txt
-                fi
-              done
-              sudo umount payload_mount
+          mkdir -p apex_unpack
+          cd apex_unpack
+          unzip -o ../original_apex
+          mkdir -p payload_mount
+          sudo mount -o loop,ro apex_payload.img payload_mount
+          sudo find payload_mount -type f 2>/dev/null | tee ../../../jar_list.txt
+          echo "--- searching for MmTelFeature.class ---"
+          sudo find payload_mount -type f \( -iname "*.jar" -o -iname "*.apk" \) 2>/dev/null | while read f; do
+            if sudo unzip -l "$f" 2>/dev/null | grep -qi "MmTelFeature.class"; then
+              echo "FOUND IN: $f" | tee -a ../../../result.txt
             fi
-            cd ..
-          fi
-          cd ..
+          done
+          sudo umount payload_mount
 
       - uses: actions/upload-artifact@v4
         with:
