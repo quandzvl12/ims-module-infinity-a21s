@@ -2,7 +2,7 @@ name: Extract Mixer Paths
 on:
   workflow_dispatch:
     inputs:
-      rom_url:https://github.com/quandzvl12/ims-module-infinity-a21s/releases/download/rom-v1/Project_Infinity-X-3.10-a21s-11.05.2026-GAPPS-UNOF.zip
+      rom_url:
         description: 'Link tải trực tiếp ROM zip'
         required: true
 
