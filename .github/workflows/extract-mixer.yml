@@ -1,0 +1,46 @@
+name: Extract Mixer Paths
+on:
+  workflow_dispatch:
+    inputs:
+      rom_url:
+        description: 'Link tải trực tiếp ROM zip'
+        required: true
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download ROM
+        run: curl -L -o rom.zip "${{ github.event.inputs.rom_url }}"
+
+      - name: Unzip ROM
+        run: unzip -o rom.zip -d rom_extracted
+
+      - name: Install extraction tools
+        run: |
+          pip install --break-system-packages liblp
+          sudo apt-get update && sudo apt-get install -y simg2img android-sdk-libsparse-utils p7zip-full
+
+      - name: Find and unpack super/vendor image
+        run: |
+          cd rom_extracted
+          ls -la
+          if [ -f super.img ]; then
+            simg2img super.img super.raw.img || cp super.img super.raw.img
+            python3 -m liblp super.raw.img -o unpacked
+          fi
+          if [ -f vendor.img ]; then
+            simg2img vendor.img vendor.raw.img || cp vendor.img vendor.raw.img
+            mkdir -p vendor_extract
+            7z x vendor.raw.img -ovendor_extract || sudo mount -o loop vendor.raw.img vendor_mount
+          fi
+
+      - name: Locate mixer_paths.xml
+        run: find rom_extracted -iname "*mixer_paths*" | tee found_files.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mixer-search-result
+          path: |
+            found_files.txt
+            rom_extracted/**/mixer_paths*.xml

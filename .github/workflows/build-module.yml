@@ -1,0 +1,65 @@
+name: Build IMS Module
+on: [workflow_dispatch, push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Get patched android.jar
+        run: |
+          curl -L -o app/libs/android.jar "<URL_ANDROID_JAR_CUA_BAN>"
+          zip -d app/libs/android.jar \
+            android/telephony/ims/feature/MmTelFeature.class \
+            'android/telephony/ims/feature/MmTelFeature$MmTelCapabilities.class'
+
+      - name: Build PhhIms APK
+        working-directory: PhhIms
+        run: ./gradlew assembleRelease
+
+      - name: Set up build-tools for aapt2
+        run: |
+          sdkmanager --install "build-tools;34.0.0"
+          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+
+      - name: Build overlay APKs
+        run: |
+          aapt2 compile --dir overlay-framework/res -o overlay-framework/compiled.zip
+          aapt2 link -o overlay-framework.apk \
+            --manifest overlay-framework/AndroidManifest.xml \
+            -I "$ANDROID_HOME/platforms/android-34/android.jar" \
+            overlay-framework/compiled.zip
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > module.jks
+
+      - name: Sign APKs
+        run: |
+          apksigner sign --ks module.jks --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASS }} --key-pass pass:${{ secrets.KEY_PASS }} \
+            PhhIms/app/build/outputs/apk/release/app-release-unsigned.apk
+          apksigner sign --ks module.jks --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASS }} --key-pass pass:${{ secrets.KEY_PASS }} \
+            overlay-framework.apk
+
+      - name: Assemble KSU module zip
+        run: |
+          mkdir -p out/system/priv-app/PhhIms out/system/product/overlay
+          cp PhhIms/app/build/outputs/apk/release/*.apk out/system/priv-app/PhhIms/PhhIms.apk
+          cp overlay-framework.apk out/system/product/overlay/
+          cp -r module-template/* out/
+          cd out && zip -r ../ims-module.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ims-module
+          path: ims-module.zip
