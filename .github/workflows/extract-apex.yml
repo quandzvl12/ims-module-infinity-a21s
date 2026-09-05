@@ -45,11 +45,11 @@ jobs:
           unzip -o ../original_apex
           mkdir -p payload_mount
           sudo mount -o loop,ro apex_payload.img payload_mount
-          sudo find payload_mount -type f 2>/dev/null | tee ../../../jar_list.txt
-          echo "--- searching for MmTelFeature.class ---"
+          sudo find payload_mount -type f 2>/dev/null | tee ../../jar_list.txt
+          echo "--- searching for MmTelFeature.class ---" | tee ../../result.txt
           sudo find payload_mount -type f \( -iname "*.jar" -o -iname "*.apk" \) 2>/dev/null | while read f; do
             if sudo unzip -l "$f" 2>/dev/null | grep -qi "MmTelFeature.class"; then
-              echo "FOUND IN: $f" | tee -a ../../../result.txt
+              echo "FOUND IN: $f" | tee -a ../../result.txt
             fi
           done
           sudo umount payload_mount
