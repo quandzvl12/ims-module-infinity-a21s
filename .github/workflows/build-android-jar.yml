@@ -1,0 +1,74 @@
+mkdir -p .github/workflows
+cat > .github/workflows/build-android-jar.yml << 'EOF'
+name: Build android.jar from ROM
+on:
+  workflow_dispatch:
+    inputs:
+      rom_url:
+        description: 'Link tải trực tiếp ROM zip'
+        required: true
+
+jobs:
+  build-jar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download ROM
+        run: curl -L -o rom.zip "${{ github.event.inputs.rom_url }}"
+
+      - name: Unzip ROM
+        run: unzip -o rom.zip -d rom_extracted
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y brotli default-jdk
+          curl -L -o sdat2img.py https://raw.githubusercontent.com/xpirt/sdat2img/master/sdat2img.py
+          curl -L -o dex-tools.zip https://github.com/pxb1988/dex2jar/releases/download/v2.4/dex-tools-v2.4.zip
+          unzip dex-tools.zip -d dex2jar
+
+      - name: Decompress and rebuild system.img
+        run: |
+          cd rom_extracted
+          brotli -d system.new.dat.br -o system.new.dat
+          python3 ../sdat2img.py system.transfer.list system.new.dat system.img
+
+      - name: Mount system.img and collect framework jars
+        run: |
+          cd rom_extracted
+          mkdir -p system_mount jars_out
+          sudo mount -o loop,ro system.img system_mount
+          FW_DIR=$(find system_mount -type d -name framework | head -1)
+          cp "$FW_DIR"/framework.jar "$FW_DIR"/services.jar \
+             "$FW_DIR"/telephony-common.jar "$FW_DIR"/ims-common.jar \
+             jars_out/ 2>/dev/null || true
+          ls -la jars_out/
+          sudo umount system_mount
+
+      - name: Convert each jar (dex) to classes.jar
+        run: |
+          cd rom_extracted/jars_out
+          for f in *.jar; do
+            name="${f%.jar}"
+            unzip -o "$f" classes.dex -d "$name" 2>/dev/null || continue
+            bash ../../dex2jar/*/d2j-dex2jar.sh "$name/classes.dex" -o "$name-src.jar" --force
+          done
+          ls -la
+
+      - name: Merge all into one android.jar
+        run: |
+          cd rom_extracted/jars_out
+          mkdir merged
+          for f in *-src.jar; do
+            unzip -o -q "$f" -d merged
+          done
+          cd merged && zip -r -q ../../../android.jar . && cd ../../../
+          ls -la android.jar
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-jar-output
+          path: android.jar
+EOF
+git add .github/workflows/build-android-jar.yml
+git commit -m "Add build-android-jar workflow"
+git push
