@@ -1,3 +1,4 @@
+cat > .github/workflows/build-android-jar.yml << 'EOF'
 name: Build android.jar from ROM
 on:
   workflow_dispatch:
@@ -30,17 +31,36 @@ jobs:
           brotli -d system.new.dat.br -o system.new.dat
           python3 ../sdat2img.py system.transfer.list system.new.dat system.img
 
-      - name: Mount system.img and collect framework jars
+      - name: Mount system.img, collect framework jars + telephonycore apex
         run: |
           cd rom_extracted
           mkdir -p system_mount jars_out
           sudo mount -o loop,ro system.img system_mount
+
+          # Jar thường trong /system/framework
           FW_DIR=$(find system_mount -type d -name framework | head -1)
           cp "$FW_DIR"/framework.jar "$FW_DIR"/services.jar \
              "$FW_DIR"/telephony-common.jar "$FW_DIR"/ims-common.jar \
              jars_out/ 2>/dev/null || true
-          ls -la jars_out/
+
+          # Bóc file capex chứa framework-telephony.jar
+          sudo cp system_mount/system/apex/com.android.telephonycore.capex ../telephonycore.capex
           sudo umount system_mount
+
+      - name: Unpack telephonycore capex and pull framework-telephony.jar
+        run: |
+          cd rom_extracted
+          mkdir -p capex_unpack/apex_unpack
+          cd capex_unpack
+          unzip -o ../telephonycore.capex
+          cd apex_unpack
+          unzip -o ../original_apex
+          mkdir -p payload_mount
+          sudo mount -o loop,ro apex_payload.img payload_mount
+          sudo cp payload_mount/javalib/framework-telephony.jar ../../jars_out/
+          sudo umount payload_mount
+          cd ../../
+          ls -la jars_out/
 
       - name: Convert each jar (dex) to classes.jar
         run: |
@@ -62,7 +82,16 @@ jobs:
           cd merged && zip -r -q ../../../android.jar . && cd ../../../
           ls -la android.jar
 
+      - name: Verify MmTelFeature is present
+        run: |
+          cd rom_extracted
+          unzip -l android.jar | grep -i "android/telephony/ims/feature/MmTelFeature" || echo "STILL NOT FOUND"
+
       - uses: actions/upload-artifact@v4
         with:
           name: android-jar-output
-          path: android.jar
+          path: rom_extracted/android.jar
+EOF
+git add .github/workflows/build-android-jar.yml
+git commit -m "Add telephonycore apex extraction to android.jar build"
+git push
