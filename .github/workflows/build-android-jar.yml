@@ -36,14 +36,12 @@ jobs:
           mkdir -p system_mount jars_out
           sudo mount -o loop,ro system.img system_mount
 
-          # Jar thường trong /system/framework
           FW_DIR=$(find system_mount -type d -name framework | head -1)
           cp "$FW_DIR"/framework.jar "$FW_DIR"/services.jar \
              "$FW_DIR"/telephony-common.jar "$FW_DIR"/ims-common.jar \
              jars_out/ 2>/dev/null || true
 
-          # Bóc file capex chứa framework-telephony.jar
-          sudo cp system_mount/system/apex/com.android.telephonycore.capex ../telephonycore.capex
+          sudo cp system_mount/system/apex/com.android.telephonycore.capex ./telephonycore.capex
           sudo umount system_mount
 
       - name: Unpack telephonycore capex and pull framework-telephony.jar
