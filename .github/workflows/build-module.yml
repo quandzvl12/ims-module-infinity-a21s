@@ -38,6 +38,12 @@ jobs:
             fi
           done
 
+      - name: Remove sharedUserId=android.uid.system (ROM dùng release-keys, không thể ký khớp)
+        run: |
+          sed -i '/android:sharedUserId="android.uid.system">/d' PhhIms/app/src/main/AndroidManifest.xml
+          sed -i 's/android:persistent="true"$/android:persistent="true">/' PhhIms/app/src/main/AndroidManifest.xml
+          cat PhhIms/app/src/main/AndroidManifest.xml
+
       - name: Build PhhIms APK
         working-directory: PhhIms
         run: ./gradlew assembleRelease
