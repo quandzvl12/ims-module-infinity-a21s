@@ -17,7 +17,7 @@ jobs:
 
       - name: Get patched android.jar
         run: |
-          curl -L -o app/libs/android.jar "<URL_ANDROID_JAR_CUA_BAN>"
+          curl -L -o app/libs/android.jar "<https://github.com/quandzvl12/ims-module-infinity-a21s/releases/download/andrjarv1/android-jar-output.zip>"
           zip -d app/libs/android.jar \
             android/telephony/ims/feature/MmTelFeature.class \
             'android/telephony/ims/feature/MmTelFeature$MmTelCapabilities.class'
