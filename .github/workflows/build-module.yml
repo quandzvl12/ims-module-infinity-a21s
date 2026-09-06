@@ -54,13 +54,18 @@ jobs:
           echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
 
       - name: Build overlay APKs
-        continue-on-error: true
         run: |
           aapt2 compile --dir overlay-framework/res -o overlay-framework/compiled.zip
           aapt2 link -o overlay-framework.apk \
             --manifest overlay-framework/AndroidManifest.xml \
             -I "$ANDROID_HOME/platforms/android-34/android.jar" \
             overlay-framework/compiled.zip
+
+          aapt2 compile --dir overlay-telephony/res -o overlay-telephony/compiled.zip
+          aapt2 link -o overlay-telephony.apk \
+            --manifest overlay-telephony/AndroidManifest.xml \
+            -I "$ANDROID_HOME/platforms/android-34/android.jar" \
+            overlay-telephony/compiled.zip
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > module.jks
@@ -70,21 +75,18 @@ jobs:
           apksigner sign --ks module.jks --ks-key-alias ${{ secrets.KEY_ALIAS }} \
             --ks-pass pass:${{ secrets.KEYSTORE_PASS }} --key-pass pass:${{ secrets.KEY_PASS }} \
             PhhIms/app/build/outputs/apk/release/app-release-unsigned.apk
-          if [ -f overlay-framework.apk ]; then
-            apksigner sign --ks module.jks --ks-key-alias ${{ secrets.KEY_ALIAS }} \
-              --ks-pass pass:${{ secrets.KEYSTORE_PASS }} --key-pass pass:${{ secrets.KEY_PASS }} \
-              overlay-framework.apk
-          else
-            echo "overlay-framework.apk không tồn tại, bỏ qua (sẽ làm sau)"
-          fi
+          apksigner sign --ks module.jks --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASS }} --key-pass pass:${{ secrets.KEY_PASS }} \
+            overlay-framework.apk
+          apksigner sign --ks module.jks --ks-key-alias ${{ secrets.KEY_ALIAS }} \
+            --ks-pass pass:${{ secrets.KEYSTORE_PASS }} --key-pass pass:${{ secrets.KEY_PASS }} \
+            overlay-telephony.apk
 
       - name: Assemble KSU module zip
         run: |
           mkdir -p out/system/priv-app/PhhIms out/system/product/overlay
           cp PhhIms/app/build/outputs/apk/release/*.apk out/system/priv-app/PhhIms/PhhIms.apk
-          if [ -f overlay-framework.apk ]; then
-            cp overlay-framework.apk out/system/product/overlay/
-          fi
+          cp overlay-framework.apk overlay-telephony.apk out/system/product/overlay/
           cp -r module-template/* out/
           cd out && zip -r ../ims-module.zip .
 
