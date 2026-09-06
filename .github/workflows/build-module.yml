@@ -1,6 +1,5 @@
 name: Build IMS Module
 on: [workflow_dispatch, push]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,12 +14,21 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Get patched android.jar
+      - name: Put full custom android.jar into app/libs (KHÔNG xóa gì khỏi file này)
         run: |
-          mkdir -p PhhIms/app/libs && curl -L -o PhhIms/app/libs/android.jar "https://github.com/quandzvl12/ims-module-infinity-a21s/releases/download/andrjarv1/android.jar"
-          zip -d PhhIms/app/libs/android.jar \
-            android/telephony/ims/feature/MmTelFeature.class \
-            'android/telephony/ims/feature/MmTelFeature$MmTelCapabilities.class'
+          mkdir -p PhhIms/app/libs
+          curl -L -o PhhIms/app/libs/android.jar "https://github.com/quandzvl12/ims-module-infinity-a21s/releases/download/andrjarv1/android.jar"
+
+      - name: Strip MmTelFeature stub from the SDK's OWN compileSdk android.jar
+        run: |
+          sdkmanager --install "platforms;android-34" "platforms;android-33" > /dev/null
+          for f in "$ANDROID_HOME"/platforms/android-34/android.jar "$ANDROID_HOME"/platforms/android-33/android.jar; do
+            if [ -f "$f" ]; then
+              zip -d "$f" \
+                android/telephony/ims/feature/MmTelFeature.class \
+                'android/telephony/ims/feature/MmTelFeature$MmTelCapabilities.class' || true
+            fi
+          done
 
       - name: Build PhhIms APK
         working-directory: PhhIms
