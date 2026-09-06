@@ -90,7 +90,3 @@ jobs:
         with:
           name: android-jar-output
           path: rom_extracted/android.jar
-EOF
-git add .github/workflows/build-android-jar.yml
-git commit -m "Add telephonycore apex extraction to android.jar build"
-git push
