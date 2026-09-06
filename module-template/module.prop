@@ -1,0 +1,6 @@
+id=ims_volte_a21s
+name=VoLTE IMS Module for A21s
+version=v1.0
+versionCode=1
+author=quandzvl12
+description=PhhIms + patched mixer_paths.xml for VoLTE on Project Infinity X (a21s)
