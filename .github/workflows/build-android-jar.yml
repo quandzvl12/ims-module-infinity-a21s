@@ -11,78 +11,76 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download ROM
-        run: curl -L -o rom.zip "${{ github.event.inputs.rom_url }}"
+        run: curl -L -o "$GITHUB_WORKSPACE/rom.zip" "${{ github.event.inputs.rom_url }}"
 
       - name: Unzip ROM
-        run: unzip -o rom.zip -d rom_extracted
+        run: unzip -o "$GITHUB_WORKSPACE/rom.zip" -d "$GITHUB_WORKSPACE/rom_extracted"
 
       - name: Install tools
         run: |
           sudo apt-get update
           sudo apt-get install -y brotli default-jdk
-          curl -L -o sdat2img.py https://raw.githubusercontent.com/xpirt/sdat2img/master/sdat2img.py
-          curl -L -o dex-tools.zip https://github.com/pxb1988/dex2jar/releases/download/v2.4/dex-tools-v2.4.zip
-          unzip dex-tools.zip -d dex2jar
+          curl -L -o "$GITHUB_WORKSPACE/sdat2img.py" https://raw.githubusercontent.com/xpirt/sdat2img/master/sdat2img.py
+          curl -L -o "$GITHUB_WORKSPACE/dex-tools.zip" https://github.com/pxb1988/dex2jar/releases/download/v2.4/dex-tools-v2.4.zip
+          unzip "$GITHUB_WORKSPACE/dex-tools.zip" -d "$GITHUB_WORKSPACE/dex2jar"
 
       - name: Decompress and rebuild system.img
         run: |
-          cd rom_extracted
+          cd "$GITHUB_WORKSPACE/rom_extracted"
           brotli -d system.new.dat.br -o system.new.dat
-          python3 ../sdat2img.py system.transfer.list system.new.dat system.img
+          python3 "$GITHUB_WORKSPACE/sdat2img.py" system.transfer.list system.new.dat system.img
 
       - name: Mount system.img, collect framework jars + telephonycore apex
         run: |
-          cd rom_extracted
+          cd "$GITHUB_WORKSPACE/rom_extracted"
           mkdir -p system_mount jars_out
           sudo mount -o loop,ro system.img system_mount
-
           FW_DIR=$(find system_mount -type d -name framework | head -1)
           cp "$FW_DIR"/framework.jar "$FW_DIR"/services.jar \
              "$FW_DIR"/telephony-common.jar "$FW_DIR"/ims-common.jar \
              jars_out/ 2>/dev/null || true
-
           sudo cp system_mount/system/apex/com.android.telephonycore.capex ./telephonycore.capex
           sudo umount system_mount
 
       - name: Unpack telephonycore capex and pull framework-telephony.jar
         run: |
-          cd rom_extracted
-          mkdir -p capex_unpack/apex_unpack
-          cd capex_unpack
-          unzip -o ../telephonycore.capex
+          WORKDIR="$GITHUB_WORKSPACE/rom_extracted"
+          mkdir -p "$WORKDIR/capex_unpack/apex_unpack"
+          cd "$WORKDIR/capex_unpack"
+          unzip -o "$WORKDIR/telephonycore.capex"
           cd apex_unpack
-          unzip -o ../original_apex
+          unzip -o original_apex
           mkdir -p payload_mount
           sudo mount -o loop,ro apex_payload.img payload_mount
-          sudo cp payload_mount/javalib/framework-telephony.jar ../../jars_out/
+          sudo cp payload_mount/javalib/framework-telephony.jar "$WORKDIR/jars_out/"
           sudo umount payload_mount
-          cd ../../
-          ls -la jars_out/
+          ls -la "$WORKDIR/jars_out/"
 
       - name: Convert each jar (dex) to classes.jar
         run: |
-          cd rom_extracted/jars_out
+          cd "$GITHUB_WORKSPACE/rom_extracted/jars_out"
           for f in *.jar; do
             name="${f%.jar}"
             unzip -o "$f" classes.dex -d "$name" 2>/dev/null || continue
-            bash ../../dex2jar/*/d2j-dex2jar.sh "$name/classes.dex" -o "$name-src.jar" --force
+            bash "$GITHUB_WORKSPACE"/dex2jar/*/d2j-dex2jar.sh "$name/classes.dex" -o "$name-src.jar" --force
           done
           ls -la
 
       - name: Merge all into one android.jar
         run: |
-          cd rom_extracted/jars_out
-          mkdir merged
+          JARS_DIR="$GITHUB_WORKSPACE/rom_extracted/jars_out"
+          mkdir -p "$JARS_DIR/merged"
+          cd "$JARS_DIR"
           for f in *-src.jar; do
             unzip -o -q "$f" -d merged
           done
-          cd merged && zip -r -q ../../../android.jar . && cd ../../../
-          ls -la android.jar
+          cd merged
+          zip -r -q "$GITHUB_WORKSPACE/rom_extracted/android.jar" .
+          ls -la "$GITHUB_WORKSPACE/rom_extracted/android.jar"
 
       - name: Verify MmTelFeature is present
         run: |
-          cd rom_extracted
-          unzip -l android.jar | grep -i "android/telephony/ims/feature/MmTelFeature" || echo "STILL NOT FOUND"
+          unzip -l "$GITHUB_WORKSPACE/rom_extracted/android.jar" | grep -i "android/telephony/ims/feature/MmTelFeature" || echo "STILL NOT FOUND"
 
       - uses: actions/upload-artifact@v4
         with:
