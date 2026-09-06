@@ -1,4 +1,3 @@
-cat > .github/workflows/build-android-jar.yml << 'EOF'
 name: Build android.jar from ROM
 on:
   workflow_dispatch:
