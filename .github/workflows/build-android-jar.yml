@@ -45,15 +45,15 @@ jobs:
       - name: Unpack telephonycore capex and pull framework-telephony.jar
         run: |
           WORKDIR="$GITHUB_WORKSPACE/rom_extracted"
-          mkdir -p "$WORKDIR/capex_unpack/apex_unpack"
-          cd "$WORKDIR/capex_unpack"
-          unzip -o "$WORKDIR/telephonycore.capex"
-          cd apex_unpack
-          unzip -o original_apex
-          mkdir -p payload_mount
-          sudo mount -o loop,ro apex_payload.img payload_mount
-          sudo cp payload_mount/javalib/framework-telephony.jar "$WORKDIR/jars_out/"
-          sudo umount payload_mount
+          mkdir -p "$WORKDIR/capex_unpack" "$WORKDIR/apex_unpack" "$WORKDIR/payload_mount"
+
+          unzip -o "$WORKDIR/telephonycore.capex" -d "$WORKDIR/capex_unpack"
+          unzip -o "$WORKDIR/capex_unpack/original_apex" -d "$WORKDIR/apex_unpack"
+
+          sudo mount -o loop,ro "$WORKDIR/apex_unpack/apex_payload.img" "$WORKDIR/payload_mount"
+          sudo cp "$WORKDIR/payload_mount/javalib/framework-telephony.jar" "$WORKDIR/jars_out/"
+          sudo umount "$WORKDIR/payload_mount"
+
           ls -la "$WORKDIR/jars_out/"
 
       - name: Convert each jar (dex) to classes.jar
