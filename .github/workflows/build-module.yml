@@ -14,6 +14,13 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Locate sdkmanager
+        id: sdk
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME" -name "sdkmanager" -type f 2>/dev/null | head -1)
+          echo "Found: $SDKMANAGER"
+          echo "path=$SDKMANAGER" >> "$GITHUB_OUTPUT"
+
       - name: Put full custom android.jar into app/libs (KHÔNG xóa gì khỏi file này)
         run: |
           mkdir -p PhhIms/app/libs
@@ -21,7 +28,8 @@ jobs:
 
       - name: Strip MmTelFeature stub from the SDK's OWN compileSdk android.jar
         run: |
-          sdkmanager --install "platforms;android-34" "platforms;android-33" > /dev/null
+          yes | "${{ steps.sdk.outputs.path }}" --licenses > /dev/null 2>&1 || true
+          "${{ steps.sdk.outputs.path }}" --install "platforms;android-34" "platforms;android-33" > /dev/null
           for f in "$ANDROID_HOME"/platforms/android-34/android.jar "$ANDROID_HOME"/platforms/android-33/android.jar; do
             if [ -f "$f" ]; then
               zip -d "$f" \
@@ -36,7 +44,7 @@ jobs:
 
       - name: Set up build-tools for aapt2
         run: |
-          sdkmanager --install "build-tools;34.0.0"
+          "${{ steps.sdk.outputs.path }}" --install "build-tools;34.0.0"
           echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
 
       - name: Build overlay APKs
