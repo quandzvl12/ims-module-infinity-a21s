@@ -46,32 +46,35 @@ jobs:
         run: |
           WORKDIR="$GITHUB_WORKSPACE/rom_extracted"
           mkdir -p "$WORKDIR/capex_unpack" "$WORKDIR/apex_unpack" "$WORKDIR/payload_mount"
-
           unzip -o "$WORKDIR/telephonycore.capex" -d "$WORKDIR/capex_unpack"
           unzip -o "$WORKDIR/capex_unpack/original_apex" -d "$WORKDIR/apex_unpack"
-
           sudo mount -o loop,ro "$WORKDIR/apex_unpack/apex_payload.img" "$WORKDIR/payload_mount"
           sudo cp "$WORKDIR/payload_mount/javalib/framework-telephony.jar" "$WORKDIR/jars_out/"
           sudo umount "$WORKDIR/payload_mount"
-
           ls -la "$WORKDIR/jars_out/"
 
-      - name: Convert each jar (dex) to classes.jar
+      - name: Convert each jar (ALL dex files, not just classes.dex) to classes.jar
         run: |
           cd "$GITHUB_WORKSPACE/rom_extracted/jars_out"
           for f in *.jar; do
             name="${f%.jar}"
-            unzip -o "$f" classes.dex -d "$name" 2>/dev/null || continue
-            bash "$GITHUB_WORKSPACE"/dex2jar/*/d2j-dex2jar.sh "$name/classes.dex" -o "$name-src.jar" --force
+            mkdir -p "$name"
+            # Lấy toàn bộ classes.dex, classes2.dex, classes3.dex... có trong jar
+            unzip -o "$f" "classes*.dex" -d "$name" 2>/dev/null
+            if ls "$name"/classes*.dex >/dev/null 2>&1; then
+              for dexfile in "$name"/classes*.dex; do
+                bash "$GITHUB_WORKSPACE"/dex2jar/*/d2j-dex2jar.sh "$dexfile" -o "$dexfile.jar" --force
+              done
+            fi
           done
-          ls -la
+          ls -la */*.jar 2>/dev/null
 
       - name: Merge all into one android.jar
         run: |
           JARS_DIR="$GITHUB_WORKSPACE/rom_extracted/jars_out"
           mkdir -p "$JARS_DIR/merged"
           cd "$JARS_DIR"
-          for f in *-src.jar; do
+          find . -name "*.dex.jar" | while read f; do
             unzip -o -q "$f" -d merged
           done
           cd merged
@@ -81,6 +84,8 @@ jobs:
       - name: Verify MmTelFeature is present
         run: |
           unzip -l "$GITHUB_WORKSPACE/rom_extracted/android.jar" | grep -i "android/telephony/ims/feature/MmTelFeature" || echo "STILL NOT FOUND"
+          echo "--- check Binder as sanity check ---"
+          unzip -l "$GITHUB_WORKSPACE/rom_extracted/android.jar" | grep "android/os/Binder.class" || echo "Binder also missing"
 
       - uses: actions/upload-artifact@v4
         with:
